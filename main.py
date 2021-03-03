@@ -24,7 +24,7 @@ if __name__ == '__main__':
     parser.add_argument('--input_dir', type=str, required=True, help='Input Directory of the parser')
     parser.add_argument('--node_tag', type=str, help='Name of the node feature.', default='node_features')
     parser.add_argument('--graph_tag', type=str, help='Name of the graph feature.', default='graph')
-    parser.add_argument('--label_tag', type=str, help='Name of the label feature.', default='target')
+    parser.add_argument('--label_tag', type=str, help='Name of the label feature.', default='targets')
 
     parser.add_argument('--feature_size', type=int, help='Size of feature vector for each node', default=100)
     parser.add_argument('--graph_embed_size', type=int, help='Size of the Graph Embedding', default=200)

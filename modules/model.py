@@ -80,3 +80,9 @@ class GGNNSum(nn.Module):
         ggnn_sum = self.classifier(h_i.sum(dim=1))
         result = self.sigmoid(ggnn_sum).squeeze(dim=-1)
         return result
+
+    def get_graph_embeddings(self, batch, cuda=False):
+        graph, features, edge_types = batch.get_network_inputs(cuda=cuda)
+        outputs = self.ggnn(graph, features, edge_types)
+        h_i, _ = batch.de_batchify_graphs(outputs)
+        return h_i.sum(dim=1).detach().cpu()
