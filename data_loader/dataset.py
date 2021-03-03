@@ -22,9 +22,13 @@ class DataEntry:
             etype_number = self.dataset.get_edge_type_number(_type)
             self.graph.add_edge(s, t, data={'etype': torch.LongTensor([etype_number])})
 
+class DataEntryInf(DataEntry):
+    def __init__(self, datset, num_nodes, features, edges, target, file_name):
+        super().__init__(datset, num_nodes, features, edges, target)
+        self.file_name = file_name
 
 class DataSet:
-    def __init__(self, train_src, valid_src=None, test_src=None, batch_size=32, n_ident=None, g_ident=None, l_ident=None):
+    def __init__(self, train_src, valid_src=None, test_src=None, batch_size=32, n_ident=None, g_ident=None, l_ident=None, inf=False):
         self.train_examples = []
         self.valid_examples = []
         self.test_examples = []
@@ -36,7 +40,11 @@ class DataSet:
         self.max_etype = 0
         self.feature_size = 0
         self.n_ident, self.g_ident, self.l_ident= load_default_identifiers(n_ident, g_ident, l_ident)
-        self.read_dataset(test_src, train_src, valid_src)
+        self.inf = inf
+        if self.inf:
+            self.read_dataset_inf(test_src, train_src, valid_src)
+        else:
+            self.read_dataset(test_src, train_src, valid_src)
         self.initialize_dataset()
 
     def initialize_dataset(self):
@@ -72,6 +80,36 @@ class DataSet:
                     example = DataEntry(datset=self, num_nodes=len(entry[self.n_ident]),
                                         features=entry[self.n_ident],
                                         edges=entry[self.g_ident], target=entry[self.l_ident][0][0])
+                    self.test_examples.append(example)
+    
+    def read_dataset_inf(self, test_src, train_src, valid_src):
+        debug('Reading Train File!')
+        with open(train_src) as fp:
+            train_data = json.load(fp)
+            for entry in tqdm(train_data):
+                example = DataEntryInf(datset=self, num_nodes=len(entry[self.n_ident]), features=entry[self.n_ident],
+                                    edges=entry[self.g_ident], target=entry[self.l_ident][0][0], file_name=entry['file_name'])
+                if self.feature_size == 0:
+                    self.feature_size = example.features.size(1)
+                    debug('Feature Size %d' % self.feature_size)
+                self.train_examples.append(example)
+        if valid_src is not None:
+            debug('Reading Validation File!')
+            with open(valid_src) as fp:
+                valid_data = json.load(fp)
+                for entry in tqdm(valid_data):
+                    example = DataEntryInf(datset=self, num_nodes=len(entry[self.n_ident]),
+                                        features=entry[self.n_ident],
+                                        edges=entry[self.g_ident], target=entry[self.l_ident][0][0], file_name=entry['file_name'])
+                    self.valid_examples.append(example)
+        if test_src is not None:
+            debug('Reading Test File!')
+            with open(test_src) as fp:
+                test_data = json.load(fp)
+                for entry in tqdm(test_data):
+                    example = DataEntryInf(datset=self, num_nodes=len(entry[self.n_ident]),
+                                        features=entry[self.n_ident],
+                                        edges=entry[self.g_ident], target=entry[self.l_ident][0][0], file_name=entry['file_name'])
                     self.test_examples.append(example)
 
     def get_edge_type_number(self, _type):
@@ -111,7 +149,11 @@ class DataSet:
         batch_graph = GGNNBatchGraph()
         for entry in taken_entries:
             batch_graph.add_subgraph(copy.deepcopy(entry.graph))
-        return batch_graph, torch.FloatTensor(labels)
+        if self.inf:
+            fns = [e.file_name for e in taken_entries]
+            return batch_graph, torch.FloatTensor(labels), fns
+        else:
+            return batch_graph, torch.FloatTensor(labels)
 
     def get_next_train_batch(self):
         if len(self.train_batches) == 0:

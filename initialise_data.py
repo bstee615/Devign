@@ -12,7 +12,7 @@ parser.add_argument('--label_tag', type=str, help='Name of the label feature.', 
 parser.add_argument('--batch_size', type=int, help='BAtch Size for training', default=128)
 args = parser.parse_args()
 
-bin_file_path = os.path.join(input_dir, 'processed.bin')
+bin_file_path = os.path.join(args.input_dir, 'processed.bin')
 if os.path.exists(bin_file_path):
     pass
 else:
@@ -20,7 +20,7 @@ else:
                         valid_src=os.path.join(args.input_dir, 'valid_GGNNinput.json'),
                         test_src=os.path.join(args.input_dir, 'test_GGNNinput.json'),
                         batch_size=args.batch_size, n_ident=args.node_tag, g_ident=args.graph_tag,
-                        l_ident=args.label_tag)
+                        l_ident=args.label_tag, inf=True)
     out_file = open(bin_file_path, 'wb')
     pickle.dump(dataset, out_file)
     out_file.close()
