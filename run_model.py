@@ -7,11 +7,10 @@ from modules.model import GGNNSum
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--model', help='path to GGNNSum model to be used', default='models/FULL/GGNNSumModel-model.bin')
-#parser.add_argument('--dataset', help='path to data to be processed (i.e. processed.bin)', default='../ReVeal/data/full_experiment_real_data_processed/chrome_debian/processed.bin')
-parser.add_argument('--dataset', help='path to data to be processed (i.e. processed.bin)', default='../full_test/ggnn_input/FULL/processed1.bin')
-
+parser.add_argument('--dataset', help='path to data to be processed (i.e. processed.bin)', default='../ReVeal/data/full_experiment_real_data_processed/chrome_debian/processed.bin')
 parser.add_argument('--output_dir', help='location to place data after ggnn processing', default='after_ggnn/chrome_debian/')
 parser.add_argument('--name', help='name of folder to save data in (to differentiate sets)', default='testRun')
+
 args = parser.parse_args()
 
 #%% data and model imports
