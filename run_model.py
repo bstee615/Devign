@@ -27,94 +27,97 @@ print('Data & Models Loaded')
 print('='*83)
 
 #%% get ggnn data from test batches
-final = []
-for l in range(len(dataset.test_batches)+1):
+if dataset.test_batches:
+    final = []
+    for l in range(len(dataset.test_batches)+1):
+        if dataset.inf:
+            graph, targets, file_names = dataset.get_next_test_batch() 
+        else:
+            graph, targets = dataset.get_next_test_batch()
+        graph.cuda(device='cuda:0')
+        graph.graph = graph.graph.to('cuda:0')
+
+        output = _model.get_graph_embeddings(graph)
+        if dataset.inf:
+            final += list(zip(output.tolist(), [int(i) for i in targets.tolist()], file_names))
+        else:
+            final += list(zip(output.tolist(), [int(i) for i in targets.tolist()]))
+
+    out = []
     if dataset.inf:
-        graph, targets, file_names = dataset.get_next_test_batch() 
+        for f in final:
+            out.append({'graph_feature':f[0], 'target':f[1], 'file_name':f[2]})
     else:
-        graph, targets = dataset.get_next_test_batch()
-    graph.cuda(device='cuda:0')
-    graph.graph = graph.graph.to('cuda:0')
+        for f in final:
+            out.append({'graph_feature':f[0], 'target':f[1]})
 
-    output = _model.get_graph_embeddings(graph)
-    if dataset.inf:
-        final += list(zip(output.tolist(), [int(i) for i in targets.tolist()], file_names))
-    else:
-        final += list(zip(output.tolist(), [int(i) for i in targets.tolist()]))
+    with open(args.output_dir + args.name + '/test_GGNNinput_graph.json', 'w') as of:
+        json.dump(out, of, indent=2)
+        of.close()
 
-out = []
-if dataset.inf:
-    for f in final:
-        out.append({'graph_feature':f[0], 'target':f[1], 'file_name':f[2]})
-else:
-    for f in final:
-        out.append({'graph_feature':f[0], 'target':f[1]})
-
-with open(args.output_dir + args.name + '/test_GGNNinput_graph.json', 'w') as of:
-    json.dump(out, of, indent=2)
-    of.close()
-
-print('DONE: TEST BATCHES')
+    print('DONE: TEST BATCHES')
 
 #%% get ggnn data from valid batches
-final = []
-for l in range(len(dataset.valid_batches)+1):
+if dataset.valid_batches:
+    final = []
+    for l in range(len(dataset.valid_batches)+1):
+        if dataset.inf:
+            graph, targets, file_names = dataset.get_next_valid_batch() 
+        else:
+            graph, targets = dataset.get_next_valid_batch()
+        graph.cuda(device='cuda:0')
+        graph.graph = graph.graph.to('cuda:0')
+
+        output = _model.get_graph_embeddings(graph)
+        if dataset.inf:
+            final += list(zip(output.tolist(), [int(i) for i in targets.tolist()], file_names))
+        else:
+            final += list(zip(output.tolist(), [int(i) for i in targets.tolist()]))
+
+    out = []
     if dataset.inf:
-        graph, targets, file_names = dataset.get_next_valid_batch() 
+        for f in final:
+            out.append({'graph_feature':f[0], 'target':f[1], 'file_name':f[2]})
     else:
-        graph, targets = dataset.get_next_valid_batch()
-    graph.cuda(device='cuda:0')
-    graph.graph = graph.graph.to('cuda:0')
+        for f in final:
+            out.append({'graph_feature':f[0], 'target':f[1]})
 
-    output = _model.get_graph_embeddings(graph)
-    if dataset.inf:
-        final += list(zip(output.tolist(), [int(i) for i in targets.tolist()], file_names))
-    else:
-        final += list(zip(output.tolist(), [int(i) for i in targets.tolist()]))
+    with open(args.output_dir + args.name + '/valid_GGNNinput_graph.json', 'w') as of:
+        json.dump(out, of, indent=2)
+        of.close()
 
-out = []
-if dataset.inf:
-    for f in final:
-        out.append({'graph_feature':f[0], 'target':f[1], 'file_name':f[2]})
-else:
-    for f in final:
-        out.append({'graph_feature':f[0], 'target':f[1]})
-
-with open(args.output_dir + args.name + '/valid_GGNNinput_graph.json', 'w') as of:
-    json.dump(out, of, indent=2)
-    of.close()
-
-print('DONE: VALID BATCHES')
+    print('DONE: VALID BATCHES')
 
 #%% get ggnn data from train batches
-final = []
-for l in range(len(dataset.train_batches)+1):
+if dataset.train_batches:
+    final = []
+    for l in range(len(dataset.train_batches)+1):
+        if dataset.inf:
+            graph, targets, file_names = dataset.get_next_train_batch() 
+        else:
+            graph, targets = dataset.get_next_train_batch()
+        graph.cuda(device='cuda:0')
+        graph.graph = graph.graph.to('cuda:0')
+
+        output = _model.get_graph_embeddings(graph)
+        if dataset.inf:
+            final += list(zip(output.tolist(), [int(i) for i in targets.tolist()], file_names))
+        else:
+            final += list(zip(output.tolist(), [int(i) for i in targets.tolist()]))
+
+    out = []
     if dataset.inf:
-        graph, targets, file_names = dataset.get_next_train_batch() 
+        for f in final:
+            out.append({'graph_feature':f[0], 'target':f[1], 'file_name':f[2]})
     else:
-        graph, targets = dataset.get_next_train_batch()
-    graph.cuda(device='cuda:0')
-    graph.graph = graph.graph.to('cuda:0')
+        for f in final:
+            out.append({'graph_feature':f[0], 'target':f[1]})
 
-    output = _model.get_graph_embeddings(graph)
-    if dataset.inf:
-        final += list(zip(output.tolist(), [int(i) for i in targets.tolist()], file_names))
-    else:
-        final += list(zip(output.tolist(), [int(i) for i in targets.tolist()]))
+    with open(args.output_dir + args.name + '/train_GGNNinput_graph.json', 'w') as of:
+        json.dump(out, of, indent=2)
+        of.close()
 
-out = []
-if dataset.inf:
-    for f in final:
-        out.append({'graph_feature':f[0], 'target':f[1], 'file_name':f[2]})
-else:
-    for f in final:
-        out.append({'graph_feature':f[0], 'target':f[1]})
-
-with open(args.output_dir + args.name + '/train_GGNNinput_graph.json', 'w') as of:
-    json.dump(out, of, indent=2)
-    of.close()
-
-print('DONE: TRAIN BATCHES')
+    print('DONE: TRAIN BATCHES')
 
 #%%
 print('='*83)
