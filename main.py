@@ -51,7 +51,7 @@ if __name__ == '__main__':
                           valid_src=os.path.join(input_dir, 'valid_GGNNinput.json'),
                           test_src=os.path.join(input_dir, 'test_GGNNinput.json'),
                           batch_size=args.batch_size, n_ident=args.node_tag, g_ident=args.graph_tag,
-                          l_ident=args.label_tag)
+                          l_ident=args.label_tag, inf=True)
         file = open(processed_data_path, 'wb')
         pickle.dump(dataset, file)
         file.close()
