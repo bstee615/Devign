@@ -12,7 +12,7 @@ parser.add_argument('--label_tag', type=str, help='Name of the label feature.', 
 parser.add_argument('--batch_size', type=int, help='BAtch Size for training', default=128)
 args = parser.parse_args()
 
-bin_file_path = os.path.join(args.input_dir, 'processed_inf.bin')
+bin_file_path = os.path.join(args.input_dir, 'processed.bin')
 if os.path.exists(bin_file_path):
     pass
 else:
