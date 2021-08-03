@@ -29,7 +29,7 @@ print('='*83)
 #%% get ggnn data from test batches
 if dataset.test_batches:
     final = []
-    for l in range(len(dataset.test_batches)+1):
+    for l in range(len(dataset.test_batches)):
         if dataset.inf:
             graph, targets, file_names = dataset.get_next_test_batch() 
         else:
@@ -60,7 +60,7 @@ if dataset.test_batches:
 #%% get ggnn data from valid batches
 if dataset.valid_batches:
     final = []
-    for l in range(len(dataset.valid_batches)+1):
+    for l in range(len(dataset.valid_batches)):
         if dataset.inf:
             graph, targets, file_names = dataset.get_next_valid_batch() 
         else:
@@ -91,7 +91,7 @@ if dataset.valid_batches:
 #%% get ggnn data from train batches
 if dataset.train_batches:
     final = []
-    for l in range(len(dataset.train_batches)+1):
+    for l in range(len(dataset.train_batches)):
         if dataset.inf:
             graph, targets, file_names = dataset.get_next_train_batch() 
         else:
