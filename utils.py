@@ -46,7 +46,8 @@ def debug(*msg, sep='\t'):
     ln = caller.lineno
     now = datetime.now()
     time = now.strftime("%m/%d/%Y - %H:%M:%S")
-    print('[' + str(time) + '] File \"' + file_name + '\", line ' + str(ln) + '  ', end='\t')
-    for m in msg:
-        print(m, end=sep)
-    print('')
+    with open('debug.txt', 'a') as f:
+        print('[' + str(time) + '] File \"' + file_name + '\", line ' + str(ln) + '  ', end='\t', file=f)
+        for m in msg:
+            print(m, end=sep, file=f)
+        print('', file=f)

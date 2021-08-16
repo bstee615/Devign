@@ -1,16 +1,16 @@
 import torch
-from dgl import DGLGraph
+import dgl
 
 
 class BatchGraph:
     def __init__(self):
-        self.graph = DGLGraph()
+        self.graph = dgl.DGLGraph()
         self.number_of_nodes = 0
         self.graphid_to_nodeids = {}
         self.num_of_subgraphs = 0
 
     def add_subgraph(self, _g):
-        assert isinstance(_g, DGLGraph)
+        assert isinstance(_g, dgl.DGLGraph)
         num_new_nodes = _g.number_of_nodes()
         self.graphid_to_nodeids[self.num_of_subgraphs] = torch.LongTensor(
             list(range(self.number_of_nodes, self.number_of_nodes + num_new_nodes)))
@@ -22,9 +22,9 @@ class BatchGraph:
         self.number_of_nodes += num_new_nodes
         self.num_of_subgraphs += 1
 
-    def cuda(self, device=None):
+    def cuda(self, device):
         for k in self.graphid_to_nodeids.keys():
-            self.graphid_to_nodeids[k] = self.graphid_to_nodeids[k].cuda(device=device)
+            self.graphid_to_nodeids[k] = self.graphid_to_nodeids[k].to(device)
 
     def de_batchify_graphs(self, features=None):
         if features is None:

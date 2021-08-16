@@ -3,7 +3,7 @@ import json
 import sys
 
 import torch
-from dgl import DGLGraph
+import dgl
 from tqdm import tqdm
 
 from data_loader.batch_graph import GGNNBatchGraph
@@ -15,7 +15,31 @@ class DataEntry:
         self.dataset = datset
         self.num_nodes = num_nodes
         self.target = target
-        self.graph = DGLGraph()
+        self.features = torch.FloatTensor(features)
+        
+        #self.graph.add_nodes(self.num_nodes, data={'features': self.features})
+        #s, types, t = zip(*edges)
+        #s = torch.tensor(s)
+        #t = torch.tensor(t)
+        #data = [{'etype': torch.tensor([self.dataset.get_edge_type_number(t) for t in types])}]
+        #self.graph.add_edges(s, t, data)
+        #self.graph = dgl.graph((s, t))
+        #self.graph.ndata['features'] = self.features
+        #self.graph.ndata['etype'] = torch.tensor([self.dataset.get_edge_type_number(t) for t in types])
+
+        #data_dict = {}
+        #for s, _type, t in edges:
+        #    k = (0, _type, 0)
+        #    if k in data_dict:
+        #        data_dict[k] = ([], [])
+        #    data_dict[k][0].append(s)
+        #    data_dict[k][1].append(t)
+        #for k in data_dict:
+        #    data_dict[k] = (torch.tensor(data_dict[k][0]), torch.tensor(data_dict[k][1]))
+        #self.graph = dgl.heterograph(data_dict)
+        #self.graph.nodes[0].data['features'] = self.features
+
+        self.graph = dgl.DGLGraph()
         self.features = torch.FloatTensor(features)
         self.graph.add_nodes(self.num_nodes, data={'features': self.features})
         for s, _type, t in edges:
@@ -28,7 +52,7 @@ class DataEntryInf(DataEntry):
         self.file_name = file_name
 
 class DataSet:
-    def __init__(self, train_src, valid_src=None, test_src=None, batch_size=32, n_ident=None, g_ident=None, l_ident=None, inf=False):
+    def __init__(self, train_src, valid_src=None, test_src=None, batch_size=128, n_ident=None, g_ident=None, l_ident=None, inf=False):
         self.train_examples = []
         self.valid_examples = []
         self.test_examples = []
