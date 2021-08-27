@@ -30,7 +30,7 @@ if __name__ == '__main__':
     parser.add_argument('--model_type', type=str, help='Type of the model (devign/ggnn)',
                         choices=['devign', 'ggnn'], default='devign')
     parser.add_argument('--input_dir', type=str, required=True, help='Input Directory of the parser')
-    parser.add_argument('--model', type=str, required=True, help='Output file for the best model')
+    parser.add_argument('--model_dir', type=str, required=True, help='Output file for the best model')
     parser.add_argument('--node_tag', type=str, help='Name of the node feature.', default='node_features')
     parser.add_argument('--graph_tag', type=str, help='Name of the graph feature.', default='graph')
     parser.add_argument('--label_tag', type=str, help='Name of the label feature.', default='targets')
@@ -39,10 +39,13 @@ if __name__ == '__main__':
     parser.add_argument('--graph_embed_size', type=int, help='Size of the Graph Embedding', default=200)
     parser.add_argument('--num_steps', type=int, help='Number of steps in GGNN', default=6)
     parser.add_argument('--batch_size', type=int, help='Batch Size for training', default=128)
-    parser.add_argument('--patience', type=int, help='Patience for early stopping', default=5)
+    parser.add_argument('--patience', type=int, help='Patience for early stopping', default=50)
     args = parser.parse_args()
 
-    logger.addHandler(logging.FileHandler(f"model{args.model_type}_patience{args.patience}.log"))
+    input_dir_tmp = args.input_dir
+    if input_dir_tmp.endswith('/'):
+        input_dir_tmp = input_dir_tmp[:-1]
+    logger.addHandler(logging.FileHandler(f"Devign_model-{args.model_type}_dataset-{input_dir_tmp.replace('/', '-')}.log"))
 
     logger.info(f"CUDA: {torch.cuda.is_available()}, {torch.version.cuda}")
     assert torch.cuda.is_available()
@@ -52,9 +55,10 @@ if __name__ == '__main__':
                      'Setting graph embedding size to feature size', file=sys.stderr)
         args.graph_embed_size = args.feature_size
 
-    model_dir = os.path.dirname(args.model)
+    model_dir = args.model_dir
     if not os.path.exists(model_dir):
         os.makedirs(model_dir)
+    model_filename = os.path.join(model_dir, f'{args.model_type}-model.pth')
     input_dir = args.input_dir
     processed_data_path = os.path.join(input_dir, 'processed.bin')
     if os.path.exists(processed_data_path):
@@ -87,4 +91,4 @@ if __name__ == '__main__':
     optim = Adam(model.parameters(), lr=0.0001, weight_decay=0.001)
     train(model=model, dataset=dataset, max_steps=1000000, log_every=None, dev_every=128,
           loss_function=loss_function, optimizer=optim,
-          save_path=args.model, max_patience=args.patience)
+          save_path=model_filename, max_patience=args.patience)

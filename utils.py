@@ -43,4 +43,4 @@ def tally_param(model):
 
 
 def debug(*msg, sep=' '):
-    logger.info(sep.join(msg))
+    logger.info(sep.join((str(m) for m in msg)))

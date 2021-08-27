@@ -1,4 +1,6 @@
 #%%
+import os
+
 import torch
 from torch.nn import BCELoss
 import pickle
@@ -9,17 +11,19 @@ import numpy as np
 from sklearn.metrics import f1_score, precision_score, recall_score, accuracy_score
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--model', help='path to GGNNSum model to be used', default='models/FULL/GGNNSumModel-model.bin')
-parser.add_argument('--dataset', help='path to data to be processed (i.e. processed.bin)', default='../ReVeal/data/full_experiment_real_data_processed/chrome_debian/processed.bin')
+parser.add_argument('--model_dir', help='path to GGNNSum model to be used', required=True)
+parser.add_argument('--dataset', help='path to data to be processed (i.e. processed.bin)', required=True)
 parser.add_argument('--output_dir', help='location to place data after ggnn processing', default='data/after_ggnn/chrome_debian/')
 parser.add_argument('--name', help='name of folder to save data in (to differentiate sets)', default='testRun')
 
 args = parser.parse_args()
 
+os.makedirs(args.output_dir, exist_ok=True)
+
 #%% data and model imports
 dataset = pickle.load(open(args.dataset, 'rb'))
 
-state_dict = torch.load(args.model)
+state_dict = torch.load(os.path.join(args.model_dir, 'ggnn-model.pth'))
 
 _model = GGNNSum(input_dim=169, output_dim=200, num_steps=6, max_edge_types=5)
 loss_function = BCELoss(reduction='sum')
@@ -67,9 +71,8 @@ if dataset.test_batches:
         for f in final:
             out.append({'graph_feature':f[0], 'target':f[1]})
 
-    with open(args.output_dir + args.name + '/test_GGNNinput_graph.json', 'w') as of:
-        json.dump(out, of, indent=2)
-        of.close()
+    with open(args.output_dir + 'test_GGNNinput_graph.pkl', 'wb') as of:
+        pickle.dump(out, of)
 
     out = {
         "loss": np.mean(all_loss),
@@ -78,7 +81,7 @@ if dataset.test_batches:
         "recall": recall_score(all_targets, all_predictions),
         "f1": f1_score(all_targets, all_predictions),
     }
-    with open(args.output_dir + args.name + '/test_result.json', 'w') as of:
+    with open(args.output_dir + 'test_result.json', 'w') as of:
         json.dump(out, of, indent=2)
 
     print('DONE: TEST BATCHES')
@@ -120,9 +123,8 @@ if dataset.valid_batches:
         for f in final:
             out.append({'graph_feature':f[0], 'target':f[1]})
 
-    with open(args.output_dir + args.name + '/valid_GGNNinput_graph.json', 'w') as of:
-        json.dump(out, of, indent=2)
-        of.close()
+    with open(args.output_dir + 'valid_GGNNinput_graph.pkl', 'wb') as of:
+        pickle.dump(out, of)
 
     out = {
         "loss": np.mean(all_loss),
@@ -131,7 +133,7 @@ if dataset.valid_batches:
         "recall": recall_score(all_targets, all_predictions),
         "f1": f1_score(all_targets, all_predictions),
     }
-    with open(args.output_dir + args.name + '/valid_result.json', 'w') as of:
+    with open(args.output_dir + 'valid_result.json', 'w') as of:
         json.dump(out, of, indent=2)
 
     print('DONE: VALID BATCHES')
@@ -174,9 +176,8 @@ if dataset.train_batches:
         for f in final:
             out.append({'graph_feature':f[0], 'target':f[1]})
 
-    with open(args.output_dir + args.name + '/train_GGNNinput_graph.json', 'w') as of:
-        json.dump(out, of, indent=2)
-        of.close()
+    with open(args.output_dir + 'train_GGNNinput_graph.pkl', 'wb') as of:
+        pickle.dump(out, of)
 
     out = {
         "loss": np.mean(all_loss),
@@ -185,7 +186,7 @@ if dataset.train_batches:
         "recall": recall_score(all_targets, all_predictions),
         "f1": f1_score(all_targets, all_predictions),
     }
-    with open(args.output_dir + args.name + '/train_result.json', 'w') as of:
+    with open(args.output_dir + 'train_result.json', 'w') as of:
         json.dump(out, of, indent=2)
 
     print('DONE: TRAIN BATCHES')
