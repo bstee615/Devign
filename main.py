@@ -12,18 +12,23 @@ from data_loader.dataset import DataSet
 from modules.model import DevignModel, GGNNSum
 from trainer import train
 from utils import tally_param, debug
+import logging
 
+logging.basicConfig(
+    format='%(asctime)s %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',
+    datefmt='%Y-%m-%d:%H:%M:%S',
+    level=logging.INFO,
+)
+logger = logging.getLogger()
 
 if __name__ == '__main__':
     torch.manual_seed(1000)
     np.random.seed(1000)
 
-    os.unlink('debug.txt')
-    
+
     parser = argparse.ArgumentParser()
     parser.add_argument('--model_type', type=str, help='Type of the model (devign/ggnn)',
                         choices=['devign', 'ggnn'], default='devign')
-    parser.add_argument('--dataset', type=str, required=True, help='Name of the dataset for experiment.')
     parser.add_argument('--input_dir', type=str, required=True, help='Input Directory of the parser')
     parser.add_argument('--model', type=str, required=True, help='Output file for the best model')
     parser.add_argument('--node_tag', type=str, help='Name of the node feature.', default='node_features')
@@ -37,12 +42,14 @@ if __name__ == '__main__':
     parser.add_argument('--patience', type=int, help='Patience for early stopping', default=5)
     args = parser.parse_args()
 
-    print("CUDA:", torch.cuda.is_available(), torch.version.cuda)
+    logger.addHandler(logging.FileHandler(f"model{args.model_type}_patience{args.patience}.log"))
+
+    logger.info(f"CUDA: {torch.cuda.is_available()}, {torch.version.cuda}")
     assert torch.cuda.is_available()
 
     if args.feature_size > args.graph_embed_size:
-        print('Warning!!! Graph Embed dimension should be at least equal to the feature dimension.\n'
-              'Setting graph embedding size to feature size', file=sys.stderr)
+        logger.error('Graph Embed dimension should be at least equal to the feature dimension.\n'
+                     'Setting graph embedding size to feature size', file=sys.stderr)
         args.graph_embed_size = args.feature_size
 
     model_dir = os.path.dirname(args.model)
@@ -55,15 +62,14 @@ if __name__ == '__main__':
         dataset = pickle.load(open(processed_data_path, 'rb'))
         debug(len(dataset.train_examples), len(dataset.valid_examples), len(dataset.test_examples))
     else:
-        dataset = DataSet(train_src=os.path.join(input_dir, 'train_GGNNinput.json'),
-                          valid_src=os.path.join(input_dir, 'valid_GGNNinput.json'),
-                          test_src=os.path.join(input_dir, 'test_GGNNinput.json'),
+        dataset = DataSet(train_src=os.path.join(input_dir, 'train_GGNNinput.pkl'),
+                          valid_src=os.path.join(input_dir, 'valid_GGNNinput.pkl'),
+                          test_src=os.path.join(input_dir, 'test_GGNNinput.pkl'),
                           batch_size=args.batch_size, n_ident=args.node_tag, g_ident=args.graph_tag,
                           l_ident=args.label_tag, inf=False)
-        file = open(processed_data_path, 'wb')
-        pickle.dump(dataset, file)
-        file.close()
-        print(dataset.feature_size)
+        with open(processed_data_path, 'wb') as file:
+            pickle.dump(dataset, file)
+    logger.info(f'Feature size: {dataset.feature_size}')
     assert args.feature_size == dataset.feature_size, \
         'Dataset contains different feature vector than argument feature size. ' \
         'Either change the feature vector size in argument, or provide different dataset.'

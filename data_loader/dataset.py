@@ -1,12 +1,11 @@
 import copy
 import json
-import sys
+import pickle
 
-import torch
 import dgl
-from tqdm import tqdm
-
+import torch
 from data_loader.batch_graph import GGNNBatchGraph
+from tqdm import tqdm
 from utils import load_default_identifiers, initialize_batch, debug
 
 
@@ -16,7 +15,7 @@ class DataEntry:
         self.num_nodes = num_nodes
         self.target = target
         self.features = torch.FloatTensor(features)
-        
+
         #self.graph.add_nodes(self.num_nodes, data={'features': self.features})
         #s, types, t = zip(*edges)
         #s = torch.tensor(s)
@@ -78,8 +77,8 @@ class DataSet:
 
     def read_dataset(self, test_src, train_src, valid_src):
         debug('Reading Train File!')
-        with open(train_src) as fp:
-            train_data = json.load(fp)
+        with open(train_src, 'rb') as fp:
+            train_data = pickle.load(fp)
             for entry in tqdm(train_data):
                 example = DataEntry(datset=self, num_nodes=len(entry[self.n_ident]), features=entry[self.n_ident],
                                     edges=entry[self.g_ident], target=entry[self.l_ident][0][0])
@@ -89,8 +88,8 @@ class DataSet:
                 self.train_examples.append(example)
         if valid_src is not None:
             debug('Reading Validation File!')
-            with open(valid_src) as fp:
-                valid_data = json.load(fp)
+            with open(valid_src, 'rb') as fp:
+                valid_data = pickle.load(fp)
                 for entry in tqdm(valid_data):
                     example = DataEntry(datset=self, num_nodes=len(entry[self.n_ident]),
                                         features=entry[self.n_ident],
@@ -98,14 +97,14 @@ class DataSet:
                     self.valid_examples.append(example)
         if test_src is not None:
             debug('Reading Test File!')
-            with open(test_src) as fp:
-                test_data = json.load(fp)
+            with open(test_src, 'rb') as fp:
+                test_data = pickle.load(fp)
                 for entry in tqdm(test_data):
                     example = DataEntry(datset=self, num_nodes=len(entry[self.n_ident]),
                                         features=entry[self.n_ident],
                                         edges=entry[self.g_ident], target=entry[self.l_ident][0][0])
                     self.test_examples.append(example)
-    
+
     def read_dataset_inf(self, test_src, train_src, valid_src):
         debug('Reading Train File!')
         with open(train_src) as fp:
