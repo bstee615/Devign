@@ -1,8 +1,10 @@
 import numpy as np
+import logging
 
 from data_loader import n_identifier, g_identifier, l_identifier
-import inspect
-from datetime import datetime
+
+
+logger = logging.getLogger(__name__)
 
 
 def load_default_identifiers(n, g, l):
@@ -40,14 +42,5 @@ def tally_param(model):
     return total
 
 
-def debug(*msg, sep='\t'):
-    caller = inspect.stack()[1]
-    file_name = caller.filename
-    ln = caller.lineno
-    now = datetime.now()
-    time = now.strftime("%m/%d/%Y - %H:%M:%S")
-    with open('debug.txt', 'a') as f:
-        print('[' + str(time) + '] File \"' + file_name + '\", line ' + str(ln) + '  ', end='\t', file=f)
-        for m in msg:
-            print(m, end=sep, file=f)
-        print('', file=f)
+def debug(*msg, sep=' '):
+    logger.info(sep.join(msg))
