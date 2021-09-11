@@ -14,7 +14,6 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--model_dir', help='path to GGNNSum model to be used', required=True)
 parser.add_argument('--dataset', help='path to data to be processed (i.e. processed.bin)', required=True)
 parser.add_argument('--output_dir', help='location to place data after ggnn processing', default='data/after_ggnn/chrome_debian/')
-parser.add_argument('--name', help='name of folder to save data in (to differentiate sets)', default='testRun')
 
 args = parser.parse_args()
 

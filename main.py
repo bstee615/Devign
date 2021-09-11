@@ -1,6 +1,7 @@
 import argparse
 import os
 import pickle
+import random
 import sys
 
 import numpy as np
@@ -22,10 +23,6 @@ logging.basicConfig(
 logger = logging.getLogger()
 
 if __name__ == '__main__':
-    torch.manual_seed(1000)
-    np.random.seed(1000)
-
-
     parser = argparse.ArgumentParser()
     parser.add_argument('--model_type', type=str, help='Type of the model (devign/ggnn)',
                         choices=['devign', 'ggnn'], default='devign')
@@ -40,7 +37,12 @@ if __name__ == '__main__':
     parser.add_argument('--num_steps', type=int, help='Number of steps in GGNN', default=6)
     parser.add_argument('--batch_size', type=int, help='Batch Size for training', default=128)
     parser.add_argument('--patience', type=int, help='Patience for early stopping', default=50)
+    parser.add_argument('--seed', default=1000, type=int)
     args = parser.parse_args()
+
+    random.seed(args.seed)
+    np.random.seed(args.seed)
+    torch.manual_seed(args.seed)
 
     input_dir_tmp = args.input_dir
     if input_dir_tmp.endswith('/'):
@@ -56,11 +58,14 @@ if __name__ == '__main__':
         args.graph_embed_size = args.feature_size
 
     model_dir = args.model_dir
-    if not os.path.exists(model_dir):
-        os.makedirs(model_dir)
+    os.makedirs(model_dir, exist_ok=True)
     model_filename = os.path.join(model_dir, f'{args.model_type}-model.pth')
     input_dir = args.input_dir
+    logfile_path = os.path.join(model_dir, f'devign-{args.model_type}.log')
+    logger.addHandler(logging.FileHandler(logfile_path))
+
     processed_data_path = os.path.join(input_dir, 'processed.bin')
+
     if os.path.exists(processed_data_path):
         debug('Reading already processed data from %s!' % processed_data_path)
         dataset = pickle.load(open(processed_data_path, 'rb'))
