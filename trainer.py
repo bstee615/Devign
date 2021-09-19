@@ -67,7 +67,7 @@ def evaluate_metrics(model, loss_function, num_batches, data_iter):
     pass
 
 
-def train(model, dataset, max_steps, dev_every, loss_function, optimizer, save_path, log_every=50, max_patience=5):
+def train(model, dataset, max_steps, dev_every, loss_function, optimizer, save_path, output_file, log_every=50, max_patience=5):
     debug('Start Training')
     train_losses = []
     best_model = None
@@ -119,3 +119,5 @@ def train(model, dataset, max_steps, dev_every, loss_function, optimizer, save_p
                                        dataset.get_next_test_batch)
     debug('%s\tTest Accuracy: %0.2f\tPrecision: %0.2f\tRecall: %0.2f\tF1: %0.2f' % (save_path, acc, pr, rc, f1))
     debug('=' * 100)
+
+    print('Test:', acc, pr, rc, f1, flush=True, file=output_file)
