@@ -1,8 +1,11 @@
 import copy
 import json
+import os
 import pickle
 
 import dgl
+import numpy as np
+import sklearn.model_selection
 import torch
 from data_loader.batch_graph import GGNNBatchGraph
 from tqdm import tqdm
@@ -10,48 +13,85 @@ from utils import load_default_identifiers, initialize_batch, debug
 
 
 class DataEntry:
-    def __init__(self, datset, num_nodes, features, edges, target):
-        self.dataset = datset
+    def __init__(self, get_edge_type_number, num_nodes, features, edges, target, filename):
         self.num_nodes = num_nodes
         self.target = target
         self.features = torch.FloatTensor(features)
-
-        #self.graph.add_nodes(self.num_nodes, data={'features': self.features})
-        #s, types, t = zip(*edges)
-        #s = torch.tensor(s)
-        #t = torch.tensor(t)
-        #data = [{'etype': torch.tensor([self.dataset.get_edge_type_number(t) for t in types])}]
-        #self.graph.add_edges(s, t, data)
-        #self.graph = dgl.graph((s, t))
-        #self.graph.ndata['features'] = self.features
-        #self.graph.ndata['etype'] = torch.tensor([self.dataset.get_edge_type_number(t) for t in types])
-
-        #data_dict = {}
-        #for s, _type, t in edges:
-        #    k = (0, _type, 0)
-        #    if k in data_dict:
-        #        data_dict[k] = ([], [])
-        #    data_dict[k][0].append(s)
-        #    data_dict[k][1].append(t)
-        #for k in data_dict:
-        #    data_dict[k] = (torch.tensor(data_dict[k][0]), torch.tensor(data_dict[k][1]))
-        #self.graph = dgl.heterograph(data_dict)
-        #self.graph.nodes[0].data['features'] = self.features
+        self.filename = filename
 
         self.graph = dgl.DGLGraph()
         self.features = torch.FloatTensor(features)
         self.graph.add_nodes(self.num_nodes, data={'features': self.features})
         for s, _type, t in edges:
-            etype_number = self.dataset.get_edge_type_number(_type)
+            etype_number = get_edge_type_number(_type)
             self.graph.add_edge(s, t, data={'etype': torch.LongTensor([etype_number])})
 
-class DataEntryInf(DataEntry):
-    def __init__(self, datset, num_nodes, features, edges, target, file_name):
-        super().__init__(datset, num_nodes, features, edges, target)
-        self.file_name = file_name
+
+class SavedDataset:
+    """
+    Saved version of the dataset before splitting.
+    It's very inefficient to preprocess each split separately, so we preprocess all the data
+    and split it later.
+    """
+    def __init__(self, examples, aug_examples, edge_types, max_etype, feature_size):
+        self.examples = examples
+        self.aug_examples = aug_examples
+        self.edge_types = edge_types
+        self.max_etype = max_etype
+        self.feature_size = feature_size
+
+    def to_dataset(self, roll, splits, batch_size):
+        examples = np.roll(self.examples, roll)
+        train_data, valid_data, test_data = np.split(examples, splits)
+        dataset = DataSet(train_data=train_data, valid_data=valid_data, test_data=test_data,
+                       augmented=self.aug_examples,
+                       edge_types=self.edge_types, max_etype=self.max_etype, feature_size=self.feature_size,
+                       batch_size=batch_size)
+        debug(f'dataset sizes: train={len(dataset.train_examples)} ({len(dataset.train_examples)-len(train_data)} augmented), valid={len(dataset.valid_examples)}, test={len(dataset.test_examples)}')
+        return dataset
+
+    @staticmethod
+    def read_dataset(n_ident, g_ident, l_ident, data_src, augmented_src):
+        max_etype = 0
+        edge_types = {}
+        feature_size = 0
+        def get_edge_type_number(_type):
+            nonlocal max_etype
+            nonlocal edge_types
+            if _type not in edge_types:
+                edge_types[_type] = max_etype
+                max_etype += 1
+            return edge_types[_type]
+
+        def to_entry(entry):
+            example = DataEntry(get_edge_type_number=get_edge_type_number, num_nodes=len(entry[n_ident]), features=entry[n_ident],
+                                edges=entry[g_ident], target=entry[l_ident][0][0], filename=entry["file_name"])
+            return example
+
+        examples = []
+        debug('Preprocessing from %s!' % data_src)
+        with open(data_src, 'rb') as fp:
+            data = pickle.load(fp)
+            for entry in tqdm(data):
+                example = to_entry(entry)
+                if feature_size == 0:
+                    feature_size = example.features.size(1)
+                    debug('Feature Size %d' % feature_size)
+                examples.append(example)
+
+        debug('Preprocessing from %s!' % augmented_src)
+        with open(augmented_src, 'rb') as fp:
+            aug_examples = pickle.load(fp)
+            for aug_dataset, aug_data in aug_examples.items():
+                for aug_filename, entry in tqdm(list(aug_data.items()), desc=aug_dataset):
+                    aug_data[aug_filename] = to_entry(entry)
+
+        debug(f'Partial stats {feature_size} {edge_types} {max_etype}')
+        return SavedDataset(examples, aug_examples, edge_types, max_etype, feature_size)
+
 
 class DataSet:
-    def __init__(self, train_src, valid_src=None, test_src=None, batch_size=128, n_ident=None, g_ident=None, l_ident=None, inf=False):
+    def __init__(self, train_data, valid_data, test_data, augmented, edge_types, max_etype, feature_size, batch_size=128):
         self.train_examples = []
         self.valid_examples = []
         self.test_examples = []
@@ -59,15 +99,16 @@ class DataSet:
         self.valid_batches = []
         self.test_batches = []
         self.batch_size = batch_size
-        self.edge_types = {}
-        self.max_etype = 0
-        self.feature_size = 0
-        self.n_ident, self.g_ident, self.l_ident= load_default_identifiers(n_ident, g_ident, l_ident)
-        self.inf = inf
-        if self.inf:
-            self.read_dataset_inf(test_src, train_src, valid_src)
-        else:
-            self.read_dataset(test_src, train_src, valid_src)
+        self.edge_types = edge_types
+        self.max_etype = max_etype
+        self.feature_size = feature_size
+        if valid_data is None:
+            valid_data = []
+        if test_data is None:
+            test_data = []
+        if augmented is None:
+            augmented = {}
+        self.load_dataset(train_data, valid_data, test_data, augmented)
         self.initialize_dataset()
 
     def initialize_dataset(self):
@@ -75,65 +116,16 @@ class DataSet:
         self.initialize_valid_batch()
         self.initialize_test_batch()
 
-    def read_dataset(self, test_src, train_src, valid_src):
-        debug('Reading Train File!')
-        with open(train_src, 'rb') as fp:
-            train_data = pickle.load(fp)
-            for entry in tqdm(train_data):
-                example = DataEntry(datset=self, num_nodes=len(entry[self.n_ident]), features=entry[self.n_ident],
-                                    edges=entry[self.g_ident], target=entry[self.l_ident][0][0])
-                if self.feature_size == 0:
-                    self.feature_size = example.features.size(1)
-                    debug('Feature Size %d' % self.feature_size)
-                self.train_examples.append(example)
-        if valid_src is not None:
-            debug('Reading Validation File!')
-            with open(valid_src, 'rb') as fp:
-                valid_data = pickle.load(fp)
-                for entry in tqdm(valid_data):
-                    example = DataEntry(datset=self, num_nodes=len(entry[self.n_ident]),
-                                        features=entry[self.n_ident],
-                                        edges=entry[self.g_ident], target=entry[self.l_ident][0][0])
-                    self.valid_examples.append(example)
-        if test_src is not None:
-            debug('Reading Test File!')
-            with open(test_src, 'rb') as fp:
-                test_data = pickle.load(fp)
-                for entry in tqdm(test_data):
-                    example = DataEntry(datset=self, num_nodes=len(entry[self.n_ident]),
-                                        features=entry[self.n_ident],
-                                        edges=entry[self.g_ident], target=entry[self.l_ident][0][0])
-                    self.test_examples.append(example)
-
-    def read_dataset_inf(self, test_src, train_src, valid_src):
-        debug('Reading Train File!')
-        with open(train_src) as fp:
-            train_data = json.load(fp)
-            for entry in tqdm(train_data):
-                example = DataEntryInf(datset=self, num_nodes=len(entry[self.n_ident]), features=entry[self.n_ident],
-                                    edges=entry[self.g_ident], target=entry[self.l_ident][0][0], file_name=entry['file_name'])
-                if self.feature_size == 0:
-                    self.feature_size = example.features.size(1)
-                    debug('Feature Size %d' % self.feature_size)
-                self.train_examples.append(example)
-        if valid_src is not None:
-            debug('Reading Validation File!')
-            with open(valid_src) as fp:
-                valid_data = json.load(fp)
-                for entry in tqdm(valid_data):
-                    example = DataEntryInf(datset=self, num_nodes=len(entry[self.n_ident]),
-                                        features=entry[self.n_ident],
-                                        edges=entry[self.g_ident], target=entry[self.l_ident][0][0], file_name=entry['file_name'])
-                    self.valid_examples.append(example)
-        if test_src is not None:
-            debug('Reading Test File!')
-            with open(test_src) as fp:
-                test_data = json.load(fp)
-                for entry in tqdm(test_data):
-                    example = DataEntryInf(datset=self, num_nodes=len(entry[self.n_ident]),
-                                        features=entry[self.n_ident],
-                                        edges=entry[self.g_ident], target=entry[self.l_ident][0][0], file_name=entry['file_name'])
-                    self.test_examples.append(example)
+    def load_dataset(self, train_data, valid_data, test_data, augmented):
+        for example in train_data:
+            self.train_examples.append(example)
+            for aug_data in augmented.values():
+                if example.filename in aug_data:
+                    self.train_examples.append(aug_data[example.filename])
+        for example in valid_data:
+            self.valid_examples.append(example)
+        for example in test_data:
+            self.test_examples.append(example)
 
     def get_edge_type_number(self, _type):
         if _type not in self.edge_types:
@@ -172,11 +164,7 @@ class DataSet:
         batch_graph = GGNNBatchGraph()
         for entry in taken_entries:
             batch_graph.add_subgraph(copy.deepcopy(entry.graph))
-        if self.inf:
-            fns = [e.file_name for e in taken_entries]
-            return batch_graph, torch.FloatTensor(labels), fns
-        else:
-            return batch_graph, torch.FloatTensor(labels)
+        return batch_graph, torch.FloatTensor(labels)
 
     def get_next_train_batch(self):
         if len(self.train_batches) == 0:
