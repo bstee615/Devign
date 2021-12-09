@@ -1,31 +1,21 @@
 import copy
-import json
-import os
+import logging
+
 import pickle
 
-import dgl
 import numpy as np
-import sklearn.model_selection
 import torch
+# from imblearn.over_sampling import SMOTE
+
 from data_loader.batch_graph import GGNNBatchGraph
 from tqdm import tqdm
-from utils import load_default_identifiers, initialize_batch, debug
 
+from data_loader.data_entry import DataEntry
+from utils import initialize_batch
+# logger = logging.getLogger(__name__)
 
-class DataEntry:
-    def __init__(self, get_edge_type_number, num_nodes, features, edges, target, filename):
-        self.num_nodes = num_nodes
-        self.target = target
-        self.features = torch.FloatTensor(features)
-        self.filename = filename
-
-        self.graph = dgl.DGLGraph()
-        self.features = torch.FloatTensor(features)
-        self.graph.add_nodes(self.num_nodes, data={'features': self.features})
-        for s, _type, t in edges:
-            etype_number = get_edge_type_number(_type)
-            self.graph.add_edge(s, t, data={'etype': torch.LongTensor([etype_number])})
-
+def debug(*msg, sep=' '):
+    print(sep.join((str(m) for m in msg)))
 
 class SavedDataset:
     """
@@ -51,7 +41,8 @@ class SavedDataset:
         return dataset
 
     @staticmethod
-    def read_dataset(n_ident, g_ident, l_ident, data_src, augmented_src):
+    def read_dataset(n_ident, g_ident, l_ident, data_src, augmented_src, use_smote=False):
+        # TODO: Replace this primitive nonsense with the hardcoded edge types
         max_etype = 0
         edge_types = {}
         feature_size = 0
@@ -64,6 +55,10 @@ class SavedDataset:
             return edge_types[_type]
 
         def to_entry(entry):
+            # graph = entry["graph"]
+            # del entry["graph"]
+            # entry.update(graph)
+            # print(entry)
             example = DataEntry(get_edge_type_number=get_edge_type_number, num_nodes=len(entry[n_ident]), features=entry[n_ident],
                                 edges=entry[g_ident], target=entry[l_ident][0][0], filename=entry["file_name"])
             return example
@@ -72,19 +67,44 @@ class SavedDataset:
         debug('Preprocessing from %s!' % data_src)
         with open(data_src, 'rb') as fp:
             data = pickle.load(fp)
-            for entry in tqdm(data):
-                example = to_entry(entry)
+            skipped = 0
+            for example in tqdm(data):
+                if 'graph' not in example or 'node_features' not in example:
+                    skipped += 1
+                    continue
+                entry = to_entry(example)
                 if feature_size == 0:
-                    feature_size = example.features.size(1)
+                    feature_size = entry.features.size(1)
                     debug('Feature Size %d' % feature_size)
-                examples.append(example)
+                examples.append(entry)
+                del example
+        debug(f'Skipped {skipped} examples')
+
+        # if use_smote:
+        #     train_features = []
+        #     train_targets = []
+        #     for entry in examples:
+        #         train_features.append(entry.features)
+        #         train_targets.append((entry.target))
+        #     train_features = np.array(train_features)
+        #     train_targets = np.array(train_targets)
+        #     # https://github.com/scikit-learn-contrib/imbalanced-learn/issues/762#issuecomment-705075051
+        #     smote = SMOTE(random_state=0)
+        #     features, targets = smote.fit_resample(train_features, train_targets)
 
         debug('Preprocessing from %s!' % augmented_src)
         with open(augmented_src, 'rb') as fp:
             aug_examples = pickle.load(fp)
+            skipped = 0
             for aug_dataset, aug_data in aug_examples.items():
-                for aug_filename, entry in tqdm(list(aug_data.items()), desc=aug_dataset):
-                    aug_data[aug_filename] = to_entry(entry)
+                for aug_filename, example in tqdm(list(aug_data.items()), desc=aug_dataset):
+                    if 'graph' not in example:
+                        skipped += 1
+                        del aug_data[aug_filename]
+                        continue
+                    aug_data[aug_filename] = to_entry(example)
+                    del example
+        debug(f'Skipped {skipped} examples')
 
         debug(f'Partial stats {feature_size} {edge_types} {max_etype}')
         return SavedDataset(examples, aug_examples, edge_types, max_etype, feature_size)
@@ -160,6 +180,7 @@ class DataSet:
 
     def get_dataset_by_ids_for_GGNN(self, entries, ids):
         taken_entries = [entries[i] for i in ids]
+        # print("DEBUG taken_entries:", taken_entries)
         labels = [e.target for e in taken_entries]
         batch_graph = GGNNBatchGraph()
         for entry in taken_entries:

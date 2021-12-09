@@ -1,14 +1,20 @@
 import copy
+import datetime
+
+import logging
+
 from sys import stderr
 
 import numpy as np
 import torch
 from sklearn.metrics import f1_score, precision_score, recall_score, accuracy_score
 
-from utils import debug
+# logger = logging.getLogger(__name__)
 
+def debug(*msg, sep=' '):
+    print(sep.join((str(m) for m in msg)))
 
-def evaluate_loss(model, loss_function, num_batches, data_iter):
+def evaluate_loss(model, loss_function, num_batches, data_iter, return_all=False):
     model.eval()
     with torch.no_grad():
         _loss = []
@@ -33,7 +39,14 @@ def evaluate_loss(model, loss_function, num_batches, data_iter):
                     .detach().cpu().int().numpy().tolist())
             all_targets.extend(targets.detach().cpu().int().numpy().tolist())
         model.train()
-        return np.mean(_loss).item(), f1_score(all_targets, all_predictions) * 100
+        if return_all:
+            return np.mean(_loss).item(),\
+                   accuracy_score(all_targets, all_predictions) * 100,\
+                   precision_score(all_targets, all_predictions) * 100, \
+                   recall_score(all_targets, all_predictions) * 100,\
+                   f1_score(all_targets, all_predictions) * 100
+        else:
+            return np.mean(_loss).item(), f1_score(all_targets, all_predictions) * 100
 
 
 def evaluate_metrics(model, loss_function, num_batches, data_iter):
@@ -67,7 +80,7 @@ def evaluate_metrics(model, loss_function, num_batches, data_iter):
     pass
 
 
-def train(model, dataset, max_steps, dev_every, loss_function, optimizer, save_path, output_file, log_every=50, max_patience=5):
+def train(model, dataset, max_steps, dev_every, loss_function, optimizer, save_path, output_file, log_every=50, max_patience=5, ray=False):
     debug('Start Training')
     train_losses = []
     best_model = None
@@ -90,8 +103,15 @@ def train(model, dataset, max_steps, dev_every, loss_function, optimizer, save_p
             batch_loss.backward()
             optimizer.step()
             if step_count % dev_every == (dev_every - 1):
-                valid_loss, valid_f1 = evaluate_loss(model, loss_function, dataset.initialize_valid_batch(),
-                                                     dataset.get_next_valid_batch)
+                # valid_loss, valid_f1 = evaluate_loss(model, loss_function, dataset.initialize_valid_batch(),
+                #                                      dataset.get_next_valid_batch)
+                valid_loss, valid_acc, valid_prec, valid_rec, valid_f1 = evaluate_loss(model, loss_function, dataset.initialize_valid_batch(),
+                                                     dataset.get_next_valid_batch, return_all=True)
+                if ray:
+                    from ray import tune
+                    tune.report(valid_loss=valid_loss,
+                                valid_acc=valid_acc, valid_prec=valid_prec,
+                                valid_rec=valid_rec, valid_f1=valid_f1)
                 if valid_f1 > best_f1:
                     patience_counter = 0
                     best_f1 = valid_f1
@@ -101,7 +121,7 @@ def train(model, dataset, max_steps, dev_every, loss_function, optimizer, save_p
                     _save_file.close()
                 else:
                     patience_counter += 1
-                debug('Step %d\t\tTrain Loss %10.3f\tValid Loss%10.3f\tValid f1: %5.2f\tPatience %d' % (
+                debug(datetime.datetime.now(), 'Step %d\t\tTrain Loss %10.3f\tValid Loss%10.3f\tValid f1: %5.2f\tPatience %d' % (
                     step_count, np.mean(train_losses).item(), valid_loss, valid_f1, patience_counter))
                 debug('=' * 100)
                 train_losses = []
@@ -117,7 +137,7 @@ def train(model, dataset, max_steps, dev_every, loss_function, optimizer, save_p
     _save_file.close()
     acc, pr, rc, f1 = evaluate_metrics(model, loss_function, dataset.initialize_test_batch(),
                                        dataset.get_next_test_batch)
-    debug('%s\tTest Accuracy: %0.2f\tPrecision: %0.2f\tRecall: %0.2f\tF1: %0.2f' % (save_path, acc, pr, rc, f1))
+    debug(datetime.datetime.now(), '%s\tTest Accuracy: %0.2f\tPrecision: %0.2f\tRecall: %0.2f\tF1: %0.2f' % (save_path, acc, pr, rc, f1))
     debug('=' * 100)
 
     print('Test:', acc, pr, rc, f1, flush=True, file=output_file)
